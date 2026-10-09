@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Калькулятор наборов 3D-раскрасок</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    [v-cloak] { display: none; }
+    /* Стилизация скроллбара */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+<div id="app" v-cloak class="min-h-screen flex flex-col">
+
+  <!-- Шапка приложения -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">ArtKit 3D Cost</h1>
+          <p class="text-xs text-slate-500">Себестоимость & Спецификации наборов</p>
+        </div>
+      </div>
+
+      <!-- Вкладки переключения -->
+      <nav class="flex space-x-1 sm:space-x-2 bg-slate-100 p-1 rounded-xl">
+        <button 
+          @click="currentTab = 'builder'"
+          :class="currentTab === 'builder' ? 'bg-white text-indigo-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+          class="px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+          <span>Конструктор</span>
+        </button>
+        <button 
+          @click="currentTab = 'catalog'"
+          :class="currentTab === 'catalog' ? 'bg-white text-indigo-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+          class="px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+          <span>Наборы ({{ savedSets.length }})</span>
+        </button>
+        <button 
+          @click="currentTab = 'warehouse'"
+          :class="currentTab === 'warehouse' ? 'bg-white text-indigo-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+          class="px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          <span>Склад сырья</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+    
+    <!-- Всплывающие уведомления (Toast) -->
+    <div v-if="toast.show" 
+         class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm transition-all duration-300"
+         :class="toast.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'">
+      <span>{{ toast.message }}</span>
+      <button @click="toast.show = false" class="text-slate-400 hover:text-slate-700 font-bold ml-2">&times;</button>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ВКЛАДКА 1: КОНСТРУКТОР НАБОРА                                -->
+    <!-- ============================================================ -->
+    <div v-if="currentTab === 'builder'" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Левая колонка: Форма комплектации набора -->
+      <div class="lg:col-span-7 space-y-6">
+        
+        <!-- Основная информация о наборе -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
+              Параметры набора
+            </h2>
+            <button @click="resetBuilder" class="text-xs text-slate-500 hover:text-indigo-600 transition">Очистить форму</button>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Название набора / Модели</label>
+              <input type="text" v-model="activeSet.name" placeholder="Например: 3D Раскраска «Маленький Дракончик»" 
+                     class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Артикул или заметка (опционально)</label>
+              <input type="text" v-model="activeSet.sku" placeholder="Напр. ART-DRG-01" 
+                     class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- Блок 3D печати (Филамент и вес) -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
+            <span class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">2</span>
+            3D Печать (Филамент)
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Выберите филамент из базы</label>
+              <select v-model="activeSet.filamentId" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                <option value="">-- Выберите пластик --</option>
+                <option v-for="f in warehouse.filaments" :key="f.id" :value="f.id">
+                  {{ f.brand }} {{ f.material }} ({{ f.color }}) — {{ (f.price / f.weight).toFixed(2) }} ₸/г
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Вес детали (в граммах)</label>
+              <div class="relative">
+                <input type="number" min="0" step="1" v-model.number="activeSet.filamentGrams" placeholder="Напр. 45" 
+                       class="w-full px-3 py-2 pr-10 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                <span class="absolute right-3 top-2 text-xs font-medium text-slate-400">г</span>
+              </div>
+            </div>
+          </div>
+          <!-- Подсказка о стоимости печати -->
+          <div v-if="selectedFilament" class="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs text-slate-600">
+            <span>Катушка: {{ selectedFilament.brand }} ({{ selectedFilament.price }} ₸ за {{ selectedFilament.weight }} г)</span>
+            <span class="font-bold text-indigo-600 text-sm">{{ filamentCost.toFixed(2) }} ₸</span>
+          </div>
+        </div>
+
+        <!-- Блок палитры красок и ёмкостей -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">3</span>
+                Краски и ёмкости
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5">Ёмкость привязана к цвету: цена тары + объем × цена 1 мл краски</p>
+            </div>
+            <button @click="addPaintSlot" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-semibold rounded-lg transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Добавить цвет
+            </button>
+          </div>
+
+          <div v-if="activeSet.paints.length === 0" class="text-center py-6 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
+            Цвета ещё не добавлены. Нажмите «Добавить цвет», чтобы скомплектовать палитру для набора.
+          </div>
+
+          <!-- Список позиций краски -->
+          <div v-else class="space-y-3">
+            <div v-for="(item, idx) in activeSet.paints" :key="idx" 
+                 class="p-3 bg-slate-50/70 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+              
+              <!-- Выбор баночки / ёмкости -->
+              <div class="sm:col-span-4">
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Тара / Ёмкость</label>
+                <select v-model="item.containerId" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <option value="">-- Выберите баночку --</option>
+                  <option v-for="c in warehouse.containers" :key="c.id" :value="c.id">
+                    {{ c.name }} ({{ c.volumeMl }} мл, {{ (c.packPrice / c.packQty).toFixed(2) }} ₸)
+                  </option>
+                </select>
+              </div>
+
+              <!-- Выбор акриловой краски -->
+              <div class="sm:col-span-5">
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Акриловая краска (партия/цвет)</label>
+                <select v-model="item.paintId" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <option value="">-- Выберите цвет --</option>
+                  <option v-for="p in warehouse.paints" :key="p.id" :value="p.id">
+                    {{ p.color }} ({{ p.brand }}) — {{ (p.price / p.volumeMl).toFixed(2) }} ₸/мл
+                  </option>
+                </select>
+              </div>
+
+              <!-- Себестоимость данной баночки с краской -->
+              <div class="sm:col-span-2 text-right">
+                <span class="block text-[11px] text-slate-400">Стоимость</span>
+                <span class="text-xs font-bold text-slate-800">{{ getPaintSlotCost(item).toFixed(2) }} ₸</span>
+              </div>
+
+              <!-- Удалить слот -->
+              <div class="sm:col-span-1 text-right">
+                <button @click="removePaintSlot(idx)" class="text-slate-400 hover:text-rose-500 p-1 rounded transition" title="Удалить">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="activeSet.paints.length > 0" class="mt-3 flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-100">
+            <span>Всего цветов: {{ activeSet.paints.length }} шт</span>
+            <span>Итого за краски и баночки: <strong class="text-slate-900 font-bold text-sm">{{ totalPaintsWithContainersCost.toFixed(2) }} ₸</strong></span>
+          </div>
+        </div>
+
+        <!-- Блок кисточек, полиграфии и упаковки -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
+            <span class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">4</span>
+            Кисти, полиграфия и упаковка
+          </h2>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- Кисть -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Кисть</label>
+              <select v-model="activeSet.brushId" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:ring-1 focus:ring-indigo-500">
+                <option value="">Без кисти (0 ₸)</option>
+                <option v-for="b in warehouse.brushes" :key="b.id" :value="b.id">
+                  {{ b.name }} ({{ b.price }} ₸)
+                </option>
+              </select>
+              <div class="flex items-center gap-2 mt-2" v-if="activeSet.brushId">
+                <label class="text-[11px] text-slate-500">Кол-во:</label>
+                <input type="number" min="1" v-model.number="activeSet.brushQty" class="w-16 px-2 py-1 text-xs border rounded-lg">
+                <span class="text-xs font-semibold text-slate-700 ml-auto">{{ brushCost.toFixed(2) }} ₸</span>
+              </div>
+            </div>
+
+            <!-- Карточка-инструкция -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Карточка / Инструкция</label>
+              <select v-model="activeSet.insertCardId" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:ring-1 focus:ring-indigo-500">
+                <option value="">Без карточки (0 ₸)</option>
+                <option v-for="c in warehouse.insertCards" :key="c.id" :value="c.id">
+                  {{ c.name }} ({{ c.price }} ₸)
+                </option>
+              </select>
+              <div class="flex items-center gap-2 mt-2" v-if="activeSet.insertCardId">
+                <label class="text-[11px] text-slate-500">Кол-во:</label>
+                <input type="number" min="1" v-model.number="activeSet.insertCardQty" class="w-16 px-2 py-1 text-xs border rounded-lg">
+                <span class="text-xs font-semibold text-slate-700 ml-auto">{{ insertCardCost.toFixed(2) }} ₸</span>
+              </div>
+            </div>
+
+            <!-- Флип / Зип пакет -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Пакет упаковки (флип/зип)</label>
+              <select v-model="activeSet.packagingId" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:ring-1 focus:ring-indigo-500">
+                <option value="">Без пакета (0 ₸)</option>
+                <option v-for="p in warehouse.packagings" :key="p.id" :value="p.id">
+                  {{ p.name }} ({{ p.price }} ₸)
+                </option>
+              </select>
+              <div class="flex items-center gap-2 mt-2" v-if="activeSet.packagingId">
+                <label class="text-[11px] text-slate-500">Кол-во:</label>
+                <input type="number" min="1" v-model.number="activeSet.packagingQty" class="w-16 px-2 py-1 text-xs border rounded-lg">
+                <span class="text-xs font-semibold text-slate-700 ml-auto">{{ packagingCost.toFixed(2) }} ₸</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Дополнительные расходы (амортизация, наклейка, электроэнергия) -->
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-xs text-slate-600 font-medium">Прочие накладные расходы на набор (свет, стикер со штрихкодом):</span>
+            <div class="relative w-28">
+              <input type="number" min="0" step="5" v-model.number="activeSet.extraOverhead" 
+                     class="w-full px-2.5 py-1 pr-6 rounded-lg border border-slate-200 text-xs text-right focus:ring-1 focus:ring-indigo-500">
+              <span class="absolute right-2 top-1 text-xs text-slate-400">₸</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Правая колонка: Сводная смета и расчёт цены продажи -->
+      <div class="lg:col-span-5 space-y-6">
+        
+        <div class="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm sticky top-24">
+          <div class="border-b border-slate-100 pb-4 mb-4">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Экономика продукта</span>
+            <h3 class="text-lg font-bold text-slate-900 mt-0.5 truncate">{{ activeSet.name || 'Новый набор' }}</h3>
+            <p class="text-xs text-slate-400" v-if="activeSet.sku">Арт: {{ activeSet.sku }}</p>
+          </div>
+
+          <!-- Детализация себестоимости по статьям -->
+          <div class="space-y-2.5 text-xs text-slate-600 mb-6">
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 3D модель (пластик {{ activeSet.filamentGrams || 0 }}г)
+              </span>
+              <span class="font-semibold text-slate-800">{{ filamentCost.toFixed(2) }} ₸</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Акриловые краски
+              </span>
+              <span class="font-semibold text-slate-800">{{ paintOnlyCost.toFixed(2) }} ₸</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Ёмкости ({{ activeSet.paints.length }} шт.)
+              </span>
+              <span class="font-semibold text-slate-800">{{ containersOnlyCost.toFixed(2) }} ₸</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Кисть ({{ activeSet.brushQty || 0 }} шт.)
+              </span>
+              <span class="font-semibold text-slate-800">{{ brushCost.toFixed(2) }} ₸</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Инструкция & пакет
+              </span>
+              <span class="font-semibold text-slate-800">{{ (insertCardCost + packagingCost).toFixed(2) }} ₸</span>
+            </div>
+            <div class="flex justify-between items-center" v-if="activeSet.extraOverhead > 0">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Накладные расходы
+              </span>
+              <span class="font-semibold text-slate-800">{{ (activeSet.extraOverhead || 0).toFixed(2) }} ₸</span>
+            </div>
+          </div>
+
+          <!-- Прогресс-бар структуры себестоимости -->
+          <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex mb-6" v-if="totalCost > 0">
+            <div :style="{ width: (filamentCost / totalCost * 100) + '%' }" class="bg-blue-500" title="Пластик"></div>
+            <div :style="{ width: (paintOnlyCost / totalCost * 100) + '%' }" class="bg-emerald-500" title="Краска"></div>
+            <div :style="{ width: (containersOnlyCost / totalCost * 100) + '%' }" class="bg-amber-500" title="Баночки"></div>
+            <div :style="{ width: (brushCost / totalCost * 100) + '%' }" class="bg-purple-500" title="Кисть"></div>
+            <div :style="{ width: ((insertCardCost + packagingCost) / totalCost * 100) + '%' }" class="bg-rose-500" title="Упаковка"></div>
+            <div :style="{ width: ((activeSet.extraOverhead || 0) / totalCost * 100) + '%' }" class="bg-slate-400" title="Накладные"></div>
+          </div>
+
+          <!-- Итоговая себестоимость -->
+          <div class="p-4 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between mb-6">
+            <div>
+              <p class="text-xs text-slate-500 font-medium">Себестоимость (BOM):</p>
+              <p class="text-2xl font-black text-slate-900 tracking-tight">{{ totalCost.toFixed(2) }} <span class="text-sm font-semibold">₸</span></p>
+            </div>
+            <span class="text-[11px] px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-slate-500 font-medium">
+              Без наценки
+            </span>
+          </div>
+
+          <!-- Калькулятор розничной цены и маржинальности -->
+          <div class="space-y-4 pt-2 border-t border-slate-100">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-slate-700">Желаемая наценка (маржа):</label>
+              <div class="flex items-center gap-1 w-24">
+                <input type="number" min="0" max="500" step="5" v-model.number="activeSet.marginPercent" 
+                       class="w-full px-2 py-1 text-xs text-right border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500">
+                <span class="text-xs text-slate-400 font-bold">%</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <!-- Рекомендуемая цена продажи -->
+              <div class="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl">
+                <span class="text-[11px] text-indigo-700 font-medium block">Реком. цена (розница)</span>
+                <span class="text-lg font-bold text-indigo-900">{{ recommendedPrice.toFixed(0) }} ₸</span>
+              </div>
+              <!-- Чистая прибыль с набора -->
+              <div class="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl">
+                <span class="text-[11px] text-emerald-700 font-medium block">Прибыль с 1 шт.</span>
+                <span class="text-lg font-bold text-emerald-900">{{ netProfit.toFixed(0) }} ₸</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Кнопка сохранения продукта -->
+          <div class="mt-6 flex gap-2">
+            <button @click="saveProductSet" 
+                    class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-md shadow-indigo-200 transition flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+              <span>Сохранить в каталог</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ВКЛАДКА 2: КАТАЛОГ ГОТОВЫХ НАБОРОВ                           -->
+    <!-- ============================================================ -->
+    <div v-if="currentTab === 'catalog'" class="space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">Готовые наборы раскрасок</h2>
+          <p class="text-xs text-slate-500">Дважды кликните по любой карточке, чтобы открыть подробный состав и спецификацию</p>
+        </div>
+        <button @click="currentTab = 'builder'" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-700 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Создать новый набор
+        </button>
+      </div>
+
+      <div v-if="savedSets.length === 0" class="bg-white p-12 text-center rounded-2xl border border-slate-200">
+        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 mb-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+        </div>
+        <h3 class="text-sm font-bold text-slate-700">Каталог пуст</h3>
+        <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Создайте и сохраните ваш первый набор через вкладку «Конструктор».</p>
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-for="item in savedSets" :key="item.id" 
+             @dblclick="openSetDetailsModal(item)"
+             class="bg-white border border-slate-200/90 hover:border-indigo-400 rounded-2xl p-5 hover:shadow-lg transition-all duration-200 flex flex-col justify-between cursor-pointer select-none group relative">
+          
+          <div>
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition-colors">{{ item.name }}</h3>
+                <span class="text-[11px] text-slate-400" v-if="item.sku">Арт: {{ item.sku }}</span>
+              </div>
+              <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-md border border-emerald-200 flex-shrink-0">
+                +{{ item.marginPercent }}%
+              </span>
+            </div>
+
+            <!-- Подсказка о двойном клике -->
+            <div class="mb-2 text-[10px] text-indigo-500 font-medium flex items-center gap-1 opacity-75 group-hover:opacity-100 transition-opacity">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>Двойной клик — просмотр состава</span>
+            </div>
+
+            <!-- Характеристики -->
+            <div class="mt-2 py-3 border-y border-slate-100 space-y-1.5 text-xs text-slate-600">
+              <div class="flex justify-between">
+                <span>3D модель:</span>
+                <span class="font-medium text-slate-800">{{ item.filamentGrams }} г ({{ getFilamentName(item.filamentId) }})</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Палитра:</span>
+                <span class="font-medium text-slate-800">{{ item.paints.length }} баночек</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Кисть:</span>
+                <span class="font-medium text-slate-800">{{ item.brushQty }} шт.</span>
+              </div>
+            </div>
+
+            <!-- Итоги -->
+            <div class="mt-4 grid grid-cols-2 gap-2 text-center">
+              <div class="p-2 bg-slate-50 rounded-xl">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block">Себестоимость</span>
+                <span class="text-sm font-bold text-slate-800">{{ item.totalCost.toFixed(0) }} ₸</span>
+              </div>
+              <div class="p-2 bg-indigo-50/60 rounded-xl">
+                <span class="text-[10px] text-indigo-500 uppercase font-bold block">Розница</span>
+                <span class="text-sm font-bold text-indigo-700">{{ item.retailPrice.toFixed(0) }} ₸</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Действия -->
+          <div class="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <button @click.stop="openSetDetailsModal(item)" class="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg bg-indigo-50/80 hover:bg-indigo-100 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                Состав
+              </button>
+              <button @click.stop="loadSetIntoBuilder(item)" class="text-slate-600 hover:text-indigo-600 font-semibold flex items-center gap-1 py-1 px-2 hover:bg-slate-100 rounded-lg transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                В конструктор
+              </button>
+            </div>
+            <button @click.stop="deleteSavedSet(item.id)" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition" title="Удалить набор">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- МОДАЛЬНОЕ ОКНО: ПРОСМОТР СОСТАВЛЯЮЩИХ НАБОРА (СПЕЦИФИКАЦИЯ)  -->
+    <!-- ============================================================ -->
+    <div v-if="showDetailsModal && detailsModalSet" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        <!-- Заголовок модалки -->
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Спецификация набора</span>
+              <span class="text-xs text-slate-400 font-mono" v-if="detailsModalSet.sku">#{{ detailsModalSet.sku }}</span>
+            </div>
+            <h2 class="text-lg font-bold text-slate-900 mt-1">{{ detailsModalSet.name }}</h2>
+          </div>
+          <button @click="showDetailsModal = false" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200/60 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Тело модалки с подробным составом -->
+        <div class="p-6 overflow-y-auto space-y-6 text-xs text-slate-700 divide-y divide-slate-100">
+          
+          <!-- 1. 3D Печать -->
+          <div class="pt-0">
+            <h4 class="font-bold text-slate-900 mb-2 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              3D Модель (Филамент)
+            </h4>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <p class="font-semibold text-slate-800 text-sm">
+                  {{ getFilamentDetails(detailsModalSet.filamentId)?.brand || 'Пластик' }} 
+                  <span class="text-xs font-normal text-slate-500">({{ getFilamentDetails(detailsModalSet.filamentId)?.material }}, цвет: {{ getFilamentDetails(detailsModalSet.filamentId)?.color }})</span>
+                </p>
+                <p class="text-[11px] text-slate-400 mt-0.5">
+                  Расход: {{ detailsModalSet.filamentGrams }} г по {{ getFilamentGramPrice(detailsModalSet.filamentId).toFixed(2) }} ₸/г
+                </p>
+              </div>
+              <div class="text-right font-bold text-slate-900 text-sm whitespace-nowrap">
+                {{ calculateSetFilamentCost(detailsModalSet).toFixed(2) }} ₸
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Палитра красок и ёмкостей -->
+          <div class="pt-4">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                Палитра красок и ёмкости ({{ detailsModalSet.paints.length }} цветов)
+              </h4>
+              <span class="text-[11px] text-slate-500 font-medium">
+                Всего: {{ calculateSetPaintsCost(detailsModalSet).toFixed(2) }} ₸
+              </span>
+            </div>
+
+            <div class="border border-slate-200/80 rounded-xl overflow-hidden">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th class="py-2 px-3">#</th>
+                    <th class="py-2 px-3">Цвет / Краска</th>
+                    <th class="py-2 px-3">Ёмкость (Тара)</th>
+                    <th class="py-2 px-3 text-right">Тара</th>
+                    <th class="py-2 px-3 text-right">Краска</th>
+                    <th class="py-2 px-3 text-right font-bold text-slate-800">Итого</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(slot, sIdx) in detailsModalSet.paints" :key="sIdx" class="hover:bg-slate-50/50">
+                    <td class="py-2 px-3 text-slate-400">{{ sIdx + 1 }}</td>
+                    <td class="py-2 px-3">
+                      <div class="flex items-center gap-2">
+                        <span class="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-xs flex-shrink-0" 
+                              :style="{ backgroundColor: getPaintDetails(slot.paintId)?.hex || '#cbd5e1' }"></span>
+                        <div>
+                          <span class="font-semibold text-slate-800">{{ getPaintDetails(slot.paintId)?.color || 'Не выбрано' }}</span>
+                          <span class="text-[10px] text-slate-400 block">{{ getPaintDetails(slot.paintId)?.brand }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="py-2 px-3 text-slate-600">
+                      {{ getContainerDetails(slot.containerId)?.name || 'Баночка' }}
+                      <span class="text-[11px] text-slate-400 font-mono">({{ getContainerDetails(slot.containerId)?.volumeMl || 0 }} мл)</span>
+                    </td>
+                    <td class="py-2 px-3 text-right text-slate-600">
+                      {{ getContainerUnitPrice(slot.containerId).toFixed(2) }} ₸
+                    </td>
+                    <td class="py-2 px-3 text-right text-slate-600">
+                      {{ getPaintMlCostForSlot(slot).toFixed(2) }} ₸
+                    </td>
+                    <td class="py-2 px-3 text-right font-bold text-indigo-600">
+                      {{ getPaintSlotCost(slot).toFixed(2) }} ₸
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3. Кисти, Полиграфия и Упаковка -->
+          <div class="pt-4">
+            <h4 class="font-bold text-slate-900 mb-2 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+              Комплектация & Упаковка
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <!-- Кисть -->
+              <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Кисть</span>
+                  <p class="font-semibold text-slate-800 text-xs">{{ getBrushDetails(detailsModalSet.brushId)?.name || 'Без кисти' }}</p>
+                  <p class="text-[11px] text-slate-500" v-if="detailsModalSet.brushId">{{ detailsModalSet.brushQty }} шт. &times; {{ getBrushDetails(detailsModalSet.brushId)?.price }} ₸</p>
+                </div>
+                <p class="font-bold text-slate-900 mt-2 text-right">{{ (getBrushDetails(detailsModalSet.brushId)?.price * detailsModalSet.brushQty || 0).toFixed(2) }} ₸</p>
+              </div>
+
+              <!-- Карточка -->
+              <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Инструкция / Вкладыш</span>
+                  <p class="font-semibold text-slate-800 text-xs">{{ getCardDetails(detailsModalSet.insertCardId)?.name || 'Без карточки' }}</p>
+                  <p class="text-[11px] text-slate-500" v-if="detailsModalSet.insertCardId">{{ detailsModalSet.insertCardQty }} шт. &times; {{ getCardDetails(detailsModalSet.insertCardId)?.price }} ₸</p>
+                </div>
+                <p class="font-bold text-slate-900 mt-2 text-right">{{ (getCardDetails(detailsModalSet.insertCardId)?.price * detailsModalSet.insertCardQty || 0).toFixed(2) }} ₸</p>
+              </div>
+
+              <!-- Пакет -->
+              <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Упаковка (Флип / Зип)</span>
+                  <p class="font-semibold text-slate-800 text-xs">{{ getPackagingDetails(detailsModalSet.packagingId)?.name || 'Без пакета' }}</p>
+                  <p class="text-[11px] text-slate-500" v-if="detailsModalSet.packagingId">{{ detailsModalSet.packagingQty }} шт. &times; {{ getPackagingDetails(detailsModalSet.packagingId)?.price }} ₸</p>
+                </div>
+                <p class="font-bold text-slate-900 mt-2 text-right">{{ (getPackagingDetails(detailsModalSet.packagingId)?.price * detailsModalSet.packagingQty || 0).toFixed(2) }} ₸</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Накладные расходы -->
+          <div class="pt-4 flex items-center justify-between" v-if="detailsModalSet.extraOverhead > 0">
+            <span class="text-xs text-slate-600 font-medium">Накладные расходы (электроэнергия, стикеры, амортизация):</span>
+            <span class="font-bold text-slate-800 text-sm">{{ Number(detailsModalSet.extraOverhead).toFixed(2) }} ₸</span>
+          </div>
+
+          <!-- 5. Итоговая сводка экономики -->
+          <div class="pt-4 bg-indigo-50/40 -mx-6 -mb-6 p-6 rounded-b-2xl border-t border-indigo-100">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div class="bg-white p-3 rounded-xl border border-indigo-100/80 shadow-xs">
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Себестоимость</span>
+                <span class="text-base font-black text-slate-900">{{ detailsModalSet.totalCost.toFixed(2) }} ₸</span>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-indigo-100/80 shadow-xs">
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Наценка</span>
+                <span class="text-base font-bold text-indigo-600">+{{ detailsModalSet.marginPercent }}%</span>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-indigo-100/80 shadow-xs">
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Розница</span>
+                <span class="text-base font-black text-indigo-700">{{ detailsModalSet.retailPrice.toFixed(0) }} ₸</span>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-emerald-100 shadow-xs">
+                <span class="text-[10px] text-emerald-600 font-bold uppercase block">Прибыль</span>
+                <span class="text-base font-black text-emerald-600">+{{ detailsModalSet.profit.toFixed(0) }} ₸</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Кнопки в футере модалки -->
+        <div class="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between gap-3">
+          <button @click="showDetailsModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+            Закрыть
+          </button>
+          <button @click="loadSetIntoBuilder(detailsModalSet); showDetailsModal = false;" 
+                  class="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            Редактировать в конструкторе
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ВКЛАДКА 3: СКЛАД СЫРЬЯ И МАТЕРИАЛОВ                          -->
+    <!-- ============================================================ -->
+    <div v-if="currentTab === 'warehouse'" class="space-y-8">
+      <div>
+        <h2 class="text-xl font-bold text-slate-900">Склад материалов и сырья</h2>
+        <p class="text-xs text-slate-500">Цены закупки, партии и автоматический пересчет себестоимости за грамм, миллилитр и единицу</p>
+      </div>
+
+      <!-- 1. Склад: Филамент -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">3D</div>
+            <h3 class="font-bold text-slate-800 text-sm">Филамент (катушки для печати)</h3>
+          </div>
+          <button @click="openAddFilamentModal" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg transition">
+            + Добавить пластик
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-2.5 px-3">Марка / Бренд</th>
+                <th class="py-2.5 px-3">Материал</th>
+                <th class="py-2.5 px-3">Цвет</th>
+                <th class="py-2.5 px-3 text-right">Вес катушки</th>
+                <th class="py-2.5 px-3 text-right">Цена катушки</th>
+                <th class="py-2.5 px-3 text-right font-bold text-slate-700">Цена за 1 г</th>
+                <th class="py-2.5 px-3 text-center">Действие</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600">
+              <tr v-for="f in warehouse.filaments" :key="f.id" class="hover:bg-slate-50/50">
+                <td class="py-2.5 px-3 font-semibold text-slate-800">{{ f.brand }}</td>
+                <td class="py-2.5 px-3">{{ f.material }}</td>
+                <td class="py-2.5 px-3">{{ f.color }}</td>
+                <td class="py-2.5 px-3 text-right">{{ f.weight }} г</td>
+                <td class="py-2.5 px-3 text-right">{{ f.price }} ₸</td>
+                <td class="py-2.5 px-3 text-right font-bold text-indigo-600">{{ (f.price / f.weight).toFixed(2) }} ₸</td>
+                <td class="py-2.5 px-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <button @click="openEditFilamentModal(f)" class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Редактировать">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </button>
+                    <button @click="removeFilament(f.id)" class="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition" title="Удалить">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 2. Склад: Ёмкости / Баночки для краски -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">Тара</div>
+            <h3 class="font-bold text-slate-800 text-sm">Ёмкости под краску (оптовая закупка)</h3>
+          </div>
+          <button @click="openAddContainerModal" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg transition">
+            + Добавить ёмкости
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-2.5 px-3">Наименование</th>
+                <th class="py-2.5 px-3 text-center">Объем (мл)</th>
+                <th class="py-2.5 px-3 text-right">Штук в партии</th>
+                <th class="py-2.5 px-3 text-right">Цена партии</th>
+                <th class="py-2.5 px-3 text-right font-bold text-slate-700">Цена за 1 шт</th>
+                <th class="py-2.5 px-3 text-center">Действие</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600">
+              <tr v-for="c in warehouse.containers" :key="c.id" class="hover:bg-slate-50/50">
+                <td class="py-2.5 px-3 font-semibold text-slate-800">{{ c.name }}</td>
+                <td class="py-2.5 px-3 text-center">{{ c.volumeMl }} мл</td>
+                <td class="py-2.5 px-3 text-right">{{ c.packQty }} шт</td>
+                <td class="py-2.5 px-3 text-right">{{ c.packPrice }} ₸</td>
+                <td class="py-2.5 px-3 text-right font-bold text-indigo-600">{{ (c.packPrice / c.packQty).toFixed(2) }} ₸</td>
+                <td class="py-2.5 px-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <button @click="openEditContainerModal(c)" class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Редактировать">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </button>
+                    <button @click="removeContainer(c.id)" class="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition" title="Удалить">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 3. Склад: Акриловые краски (в бутылках) -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">Акрил</div>
+            <h3 class="font-bold text-slate-800 text-sm">Акриловая краска (бутылки / партии)</h3>
+          </div>
+          <button @click="openAddPaintModal" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg transition">
+            + Добавить бутылку краски
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-2.5 px-3">Цвет краски</th>
+                <th class="py-2.5 px-3">Бренд / Партия</th>
+                <th class="py-2.5 px-3 text-right">Объем бутылки</th>
+                <th class="py-2.5 px-3 text-right">Цена закупки</th>
+                <th class="py-2.5 px-3 text-right font-bold text-slate-700">Цена за 1 мл</th>
+                <th class="py-2.5 px-3 text-center">Действие</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600">
+              <tr v-for="p in warehouse.paints" :key="p.id" class="hover:bg-slate-50/50">
+                <td class="py-2.5 px-3 font-semibold text-slate-800 flex items-center gap-2">
+                  <span class="w-3.5 h-3.5 rounded-full border border-slate-300" :style="{ backgroundColor: p.hex || '#6366f1' }"></span>
+                  {{ p.color }}
+                </td>
+                <td class="py-2.5 px-3">{{ p.brand }}</td>
+                <td class="py-2.5 px-3 text-right">{{ p.volumeMl }} мл</td>
+                <td class="py-2.5 px-3 text-right">{{ p.price }} ₸</td>
+                <td class="py-2.5 px-3 text-right font-bold text-indigo-600">{{ (p.price / p.volumeMl).toFixed(2) }} ₸</td>
+                <td class="py-2.5 px-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <button @click="openEditPaintModal(p)" class="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Редактировать">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </button>
+                    <button @click="removePaint(p.id)" class="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition" title="Удалить">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 4. Склад: Кисточки, Полиграфия и Пакеты -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Кисти -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-bold text-xs text-slate-800">Кисточки</h4>
+            <button @click="promptAddAccessory('brush')" class="text-[11px] text-indigo-600 font-semibold hover:underline">+ Добавить</button>
+          </div>
+          <ul class="divide-y divide-slate-100 text-xs">
+            <li v-for="b in warehouse.brushes" :key="b.id" class="py-2 flex justify-between items-center">
+              <span>{{ b.name }}</span>
+              <div class="flex items-center gap-1.5">
+                <strong class="text-slate-800 mr-1">{{ b.price }} ₸</strong>
+                <button @click="promptEditAccessory('brush', b)" class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Редактировать">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button @click="removeWarehouseItem('brushes', b.id)" class="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition" title="Удалить">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Инструкции -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-bold text-xs text-slate-800">Карточки / Полиграфия</h4>
+            <button @click="promptAddAccessory('card')" class="text-[11px] text-indigo-600 font-semibold hover:underline">+ Добавить</button>
+          </div>
+          <ul class="divide-y divide-slate-100 text-xs">
+            <li v-for="c in warehouse.insertCards" :key="c.id" class="py-2 flex justify-between items-center">
+              <span>{{ c.name }}</span>
+              <div class="flex items-center gap-1.5">
+                <strong class="text-slate-800 mr-1">{{ c.price }} ₸</strong>
+                <button @click="promptEditAccessory('card', c)" class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Редактировать">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button @click="removeWarehouseItem('insertCards', c.id)" class="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition" title="Удалить">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Упаковка (Флип-пакеты) -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-bold text-xs text-slate-800">Пакеты (Флип / Зип)</h4>
+            <button @click="promptAddAccessory('packaging')" class="text-[11px] text-indigo-600 font-semibold hover:underline">+ Добавить</button>
+          </div>
+          <ul class="divide-y divide-slate-100 text-xs">
+            <li v-for="p in warehouse.packagings" :key="p.id" class="py-2 flex justify-between items-center">
+              <span>{{ p.name }}</span>
+              <div class="flex items-center gap-1.5">
+                <strong class="text-slate-800 mr-1">{{ p.price }} ₸</strong>
+                <button @click="promptEditAccessory('packaging', p)" class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Редактировать">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button @click="removeWarehouseItem('packagings', p.id)" class="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition" title="Удалить">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- МОДАЛЬНЫЕ ОКНА ДЛЯ ДОБАВЛЕНИЯ И РЕДАКТИРОВАНИЯ СЫРЬЯ         -->
+    <!-- ============================================================ -->
+    
+    <!-- Модалка: Филамент -->
+    <div v-if="showAddFilamentModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4">
+        <h3 class="font-bold text-base text-slate-900">{{ editingFilamentId ? 'Редактировать пластик (филамент)' : 'Добавить пластик (филамент)' }}</h3>
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Марка / Бренд</label>
+            <input type="text" v-model="newFilament.brand" placeholder="Например: eSun, Kingroon, FDplast" class="w-full px-3 py-2 border rounded-xl">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Тип материала</label>
+              <input type="text" v-model="newFilament.material" placeholder="PLA, PETG..." class="w-full px-3 py-2 border rounded-xl">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Цвет</label>
+              <input type="text" v-model="newFilament.color" placeholder="Белый, Бежевый" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Вес катушки (г)</label>
+              <input type="number" v-model.number="newFilament.weight" placeholder="1000" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Цена катушки (₸)</label>
+              <input type="number" v-model.number="newFilament.price" placeholder="7500" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showAddFilamentModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button @click="saveFilament" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+            {{ editingFilamentId ? 'Сохранить изменения' : 'Сохранить' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модалка: Ёмкости -->
+    <div v-if="showAddContainerModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4">
+        <h3 class="font-bold text-base text-slate-900">{{ editingContainerId ? 'Редактировать партию ёмкостей' : 'Добавить партию ёмкостей для краски' }}</h3>
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Название / Описание</label>
+            <input type="text" v-model="newContainer.name" placeholder="Баночки-полоски 5мл с крышкой" class="w-full px-3 py-2 border rounded-xl">
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Объём (мл)</label>
+              <input type="number" step="0.5" v-model.number="newContainer.volumeMl" placeholder="5" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Шт в партии</label>
+              <input type="number" v-model.number="newContainer.packQty" placeholder="500" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Цена партии (₸)</label>
+              <input type="number" v-model.number="newContainer.packPrice" placeholder="9500" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showAddContainerModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button @click="saveContainer" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+            {{ editingContainerId ? 'Сохранить изменения' : 'Сохранить' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модалка: Акриловая краска -->
+    <div v-if="showAddPaintModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4">
+        <h3 class="font-bold text-base text-slate-900">{{ editingPaintId ? 'Редактировать краску' : 'Добавить бутылку акриловой краски' }}</h3>
+        <div class="space-y-3 text-xs">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Цвет краски</label>
+              <input type="text" v-model="newPaint.color" placeholder="Ультрамарин, Охра..." class="w-full px-3 py-2 border rounded-xl">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Цветовой маркер (Hex)</label>
+              <div class="flex items-center gap-2">
+                <input type="color" v-model="newPaint.hex" class="w-8 h-8 rounded border p-0.5 cursor-pointer">
+                <input type="text" v-model="newPaint.hex" class="w-full px-2 py-1.5 border rounded-xl font-mono text-[11px]">
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Марка / Партия</label>
+            <input type="text" v-model="newPaint.brand" placeholder="Decola, Ладога, Таир" class="w-full px-3 py-2 border rounded-xl">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Объём бутылки (мл)</label>
+              <input type="number" v-model.number="newPaint.volumeMl" placeholder="500" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Цена закупки (₸)</label>
+              <input type="number" v-model.number="newPaint.price" placeholder="2200" class="w-full px-3 py-2 border rounded-xl">
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="showAddPaintModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button @click="savePaint" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+            {{ editingPaintId ? 'Сохранить изменения' : 'Сохранить' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модалка: Простой аксессуар (Кисть / Карточка / Пакет) -->
+    <div v-if="accessoryModal.show" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4">
+        <h3 class="font-bold text-base text-slate-900">{{ accessoryModal.title }}</h3>
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Название</label>
+            <input type="text" v-model="accessoryModal.name" placeholder="Название позиции" class="w-full px-3 py-2 border rounded-xl">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Стоимость за 1 штуку (₸)</label>
+            <input type="number" step="5" v-model.number="accessoryModal.price" placeholder="90" class="w-full px-3 py-2 border rounded-xl">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button @click="accessoryModal.show = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button @click="saveAccessoryItem" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+            {{ accessoryModal.id ? 'Сохранить изменения' : 'Добавить' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const { createApp } = Vue;
+
+  createApp({
+    data() {
+      return {
+        currentTab: 'builder', // 'builder' | 'catalog' | 'warehouse'
+
+        // Уведомления
+        toast: {
+          show: false,
+          message: '',
+          type: 'success'
+        },
+
+        // Модальное окно просмотра деталей набора (спецификация по двойному клику)
+        showDetailsModal: false,
+        detailsModalSet: null,
+
+        // Модальные окна склада
+        showAddFilamentModal: false,
+        editingFilamentId: null,
+
+        showAddContainerModal: false,
+        editingContainerId: null,
+
+        showAddPaintModal: false,
+        editingPaintId: null,
+
+        accessoryModal: {
+          show: false,
+          id: null,
+          type: 'brush',
+          title: '',
+          name: '',
+          price: 90
+        },
+
+        // Формы добавления / редактирования сырья (в тенге)
+        newFilament: { brand: '', material: 'PLA', color: '', weight: 1000, price: 7500 },
+        newContainer: { name: '', volumeMl: 5, packQty: 100, packPrice: 2800 },
+        newPaint: { color: '', brand: '', hex: '#3b82f6', volumeMl: 250, price: 1800 },
+
+        // База данных склада (Сырьё) с ценами в тенге (₸)
+        warehouse: {
+          filaments: [
+            { id: 'f-1', brand: 'FDplast', material: 'PLA', color: 'Белый шелк', weight: 1000, price: 7500 },
+            { id: 'f-2', brand: 'eSun', material: 'PLA+', color: 'Слоновая кость', weight: 1000, price: 8800 },
+            { id: 'f-3', brand: 'Kingroon', material: 'PETG', color: 'Серый матовый', weight: 1000, price: 6500 }
+          ],
+          containers: [
+            { id: 'c-1', name: 'Баночки с крышкой в спайке', volumeMl: 3, packQty: 600, packPrice: 9500 },
+            { id: 'c-2', name: 'Баночки-полоски 5мл', volumeMl: 5, packQty: 100, packPrice: 2800 },
+            { id: 'c-3', name: 'Круглые баночки винтовые', volumeMl: 10, packQty: 50, packPrice: 2200 }
+          ],
+          paints: [
+            { id: 'p-1', color: 'Красный алый', brand: 'Decola', hex: '#ef4444', volumeMl: 250, price: 1800 },
+            { id: 'p-2', color: 'Синий ультрамарин', brand: 'Decola', hex: '#2563eb', volumeMl: 250, price: 1800 },
+            { id: 'p-3', color: 'Желтый лимонный', brand: 'Decola', hex: '#eab308', volumeMl: 250, price: 1800 },
+            { id: 'p-4', color: 'Зеленый травяной', brand: 'Decola', hex: '#22c55e', volumeMl: 250, price: 1900 },
+            { id: 'p-5', color: 'Черный глубокий', brand: 'Decola', hex: '#0f172a', volumeMl: 500, price: 3100 },
+            { id: 'p-6', color: 'Белила титановые', brand: 'Ладога', hex: '#f8fafc', volumeMl: 500, price: 3400 }
+          ],
+          brushes: [
+            { id: 'b-1', name: 'Кисть синтетика круглая №2', price: 95 },
+            { id: 'b-2', name: 'Кисть синтетика плоская №4', price: 130 }
+          ],
+          insertCards: [
+            { id: 'i-1', name: 'Инструкция + палитра (глянец А6)', price: 35 },
+            { id: 'i-2', name: 'Мини-открытка с QR-кодом', price: 20 }
+          ],
+          packagings: [
+            { id: 'pk-1', name: 'Флип-пакет с клеевой полосой 15x20 см', price: 25 },
+            { id: 'pk-2', name: 'Дой-пак крафт с окном', price: 65 }
+          ]
+        },
+
+        // Активный набор в конструкторе
+        activeSet: {
+          id: null,
+          name: '3D Раскраска: Дракончик Эрни',
+          sku: 'KIT-3D-DRG',
+          filamentId: 'f-1',
+          filamentGrams: 42,
+          paints: [
+            { containerId: 'c-2', paintId: 'p-1' },
+            { containerId: 'c-2', paintId: 'p-3' },
+            { containerId: 'c-2', paintId: 'p-4' },
+            { containerId: 'c-2', paintId: 'p-5' }
+          ],
+          brushId: 'b-1',
+          brushQty: 1,
+          insertCardId: 'i-1',
+          insertCardQty: 1,
+          packagingId: 'pk-1',
+          packagingQty: 1,
+          extraOverhead: 50, // Наклейки, свет и т.д. в тенге
+          marginPercent: 120 // Наценка %
+        },
+
+        // Сохранённые наборы
+        savedSets: []
+      };
+    },
+
+    computed: {
+      // Выбранный пластик в конструкторе
+      selectedFilament() {
+        return this.warehouse.filaments.find(f => f.id === this.activeSet.filamentId);
+      },
+
+      // Стоимость 3D печати пластиком в конструкторе
+      filamentCost() {
+        if (!this.selectedFilament || !this.activeSet.filamentGrams) return 0;
+        const pricePerGram = this.selectedFilament.price / this.selectedFilament.weight;
+        return pricePerGram * this.activeSet.filamentGrams;
+      },
+
+      // Стоимость только краски в конструкторе
+      paintOnlyCost() {
+        return this.activeSet.paints.reduce((acc, slot) => {
+          const container = this.warehouse.containers.find(c => c.id === slot.containerId);
+          const paint = this.warehouse.paints.find(p => p.id === slot.paintId);
+          if (!container || !paint) return acc;
+          const costPerMl = paint.price / paint.volumeMl;
+          return acc + (costPerMl * container.volumeMl);
+        }, 0);
+      },
+
+      // Стоимость только ёмкостей (тары) в конструкторе
+      containersOnlyCost() {
+        return this.activeSet.paints.reduce((acc, slot) => {
+          const container = this.warehouse.containers.find(c => c.id === slot.containerId);
+          if (!container) return acc;
+          const pricePerItem = container.packPrice / container.packQty;
+          return acc + pricePerItem;
+        }, 0);
+      },
+
+      // Суммарная стоимость всех баночек вместе с краской
+      totalPaintsWithContainersCost() {
+        return this.paintOnlyCost + this.containersOnlyCost;
+      },
+
+      // Стоимость кисточек
+      brushCost() {
+        const b = this.warehouse.brushes.find(item => item.id === this.activeSet.brushId);
+        return b ? b.price * (this.activeSet.brushQty || 1) : 0;
+      },
+
+      // Стоимость карточки/инструкции
+      insertCardCost() {
+        const c = this.warehouse.insertCards.find(item => item.id === this.activeSet.insertCardId);
+        return c ? c.price * (this.activeSet.insertCardQty || 1) : 0;
+      },
+
+      // Стоимость пакета
+      packagingCost() {
+        const p = this.warehouse.packagings.find(item => item.id === this.activeSet.packagingId);
+        return p ? p.price * (this.activeSet.packagingQty || 1) : 0;
+      },
+
+      // ИТОГОВАЯ СЕБЕСТОИМОСТЬ НАБОРА (BOM)
+      totalCost() {
+        return this.filamentCost +
+               this.totalPaintsWithContainersCost +
+               this.brushCost +
+               this.insertCardCost +
+               this.packagingCost +
+               (Number(this.activeSet.extraOverhead) || 0);
+      },
+
+      // Рекомендованная розничная цена с учетом наценки
+      recommendedPrice() {
+        const margin = Number(this.activeSet.marginPercent) || 0;
+        return this.totalCost * (1 + margin / 100);
+      },
+
+      // Прибыль с единицы товара
+      netProfit() {
+        return this.recommendedPrice - this.totalCost;
+      }
+    },
+
+    methods: {
+      showToast(message, type = 'success') {
+        this.toast.message = message;
+        this.toast.type = type;
+        this.toast.show = true;
+        setTimeout(() => { this.toast.show = false; }, 3500);
+      },
+
+      // Открытие карточки состава набора по двойному клику
+      openSetDetailsModal(item) {
+        this.detailsModalSet = JSON.parse(JSON.stringify(item));
+        this.showDetailsModal = true;
+      },
+
+      // Помощники поиска данных сырья для деталей набора
+      getFilamentDetails(id) {
+        return this.warehouse.filaments.find(f => f.id === id);
+      },
+      getFilamentGramPrice(id) {
+        const f = this.getFilamentDetails(id);
+        return f ? (f.price / f.weight) : 0;
+      },
+      calculateSetFilamentCost(set) {
+        const p = this.getFilamentGramPrice(set.filamentId);
+        return p * (set.filamentGrams || 0);
+      },
+      getContainerDetails(id) {
+        return this.warehouse.containers.find(c => c.id === id);
+      },
+      getContainerUnitPrice(id) {
+        const c = this.getContainerDetails(id);
+        return c ? (c.packPrice / c.packQty) : 0;
+      },
+      getPaintDetails(id) {
+        return this.warehouse.paints.find(p => p.id === id);
+      },
+      getPaintMlCostForSlot(slot) {
+        const container = this.getContainerDetails(slot.containerId);
+        const paint = this.getPaintDetails(slot.paintId);
+        if (!container || !paint) return 0;
+        return (paint.price / paint.volumeMl) * container.volumeMl;
+      },
+      calculateSetPaintsCost(set) {
+        return set.paints.reduce((acc, slot) => acc + this.getPaintSlotCost(slot), 0);
+      },
+      getBrushDetails(id) {
+        return this.warehouse.brushes.find(b => b.id === id);
+      },
+      getCardDetails(id) {
+        return this.warehouse.insertCards.find(c => c.id === id);
+      },
+      getPackagingDetails(id) {
+        return this.warehouse.packagings.find(p => p.id === id);
+      },
+
+      // Расчет себестоимости отдельного слота краски (тара + объем * краска)
+      getPaintSlotCost(slot) {
+        let cost = 0;
+        const container = this.warehouse.containers.find(c => c.id === slot.containerId);
+        const paint = this.warehouse.paints.find(p => p.id === slot.paintId);
+
+        if (container) {
+          cost += (container.packPrice / container.packQty);
+        }
+        if (container && paint) {
+          cost += (paint.price / paint.volumeMl) * container.volumeMl;
+        }
+        return cost;
+      },
+
+      addPaintSlot() {
+        const defaultContainer = this.warehouse.containers[0]?.id || '';
+        const defaultPaint = this.warehouse.paints[0]?.id || '';
+        this.activeSet.paints.push({
+          containerId: defaultContainer,
+          paintId: defaultPaint
+        });
+      },
+
+      removePaintSlot(index) {
+        this.activeSet.paints.splice(index, 1);
+      },
+
+      resetBuilder() {
+        this.activeSet = {
+          id: null,
+          name: '',
+          sku: '',
+          filamentId: this.warehouse.filaments[0]?.id || '',
+          filamentGrams: 30,
+          paints: [],
+          brushId: this.warehouse.brushes[0]?.id || '',
+          brushQty: 1,
+          insertCardId: this.warehouse.insertCards[0]?.id || '',
+          insertCardQty: 1,
+          packagingId: this.warehouse.packagings[0]?.id || '',
+          packagingQty: 1,
+          extraOverhead: 30,
+          marginPercent: 100
+        };
+      },
+
+      saveProductSet() {
+        if (!this.activeSet.name.trim()) {
+          this.showToast('Пожалуйста, укажите название набора', 'error');
+          return;
+        }
+
+        const setRecord = {
+          ...JSON.parse(JSON.stringify(this.activeSet)),
+          id: this.activeSet.id || 'set-' + Date.now(),
+          totalCost: this.totalCost,
+          retailPrice: this.recommendedPrice,
+          profit: this.netProfit
+        };
+
+        const existingIndex = this.savedSets.findIndex(s => s.id === setRecord.id);
+        if (existingIndex >= 0) {
+          this.savedSets[existingIndex] = setRecord;
+          this.showToast(`Набор «${setRecord.name}» успешно обновлен!`);
+        } else {
+          this.savedSets.push(setRecord);
+          this.activeSet.id = setRecord.id;
+          this.showToast(`Набор «${setRecord.name}» сохранен в каталог!`);
+        }
+        this.saveToStorage();
+      },
+
+      loadSetIntoBuilder(item) {
+        this.activeSet = JSON.parse(JSON.stringify(item));
+        this.currentTab = 'builder';
+        this.showToast(`Загружен набор: ${item.name}`);
+      },
+
+      deleteSavedSet(id) {
+        this.savedSets = this.savedSets.filter(s => s.id !== id);
+        this.saveToStorage();
+        this.showToast('Набор удален из каталога');
+      },
+
+      getFilamentName(id) {
+        const f = this.warehouse.filaments.find(item => item.id === id);
+        return f ? `${f.brand} ${f.material}` : 'Пластик';
+      },
+
+      // Управление складом: Филамент
+      openAddFilamentModal() {
+        this.editingFilamentId = null;
+        this.newFilament = { brand: '', material: 'PLA', color: '', weight: 1000, price: 7500 };
+        this.showAddFilamentModal = true;
+      },
+
+      openEditFilamentModal(item) {
+        this.editingFilamentId = item.id;
+        this.newFilament = { ...item };
+        this.showAddFilamentModal = true;
+      },
+
+      saveFilament() {
+        if (!this.newFilament.brand || !this.newFilament.weight || !this.newFilament.price) {
+          this.showToast('Заполните бренд, вес и цену катушки', 'error');
+          return;
+        }
+
+        if (this.editingFilamentId) {
+          const index = this.warehouse.filaments.findIndex(f => f.id === this.editingFilamentId);
+          if (index !== -1) {
+            this.warehouse.filaments[index] = { ...this.newFilament, id: this.editingFilamentId };
+            this.showToast('Филамент успешно обновлен');
+          }
+        } else {
+          this.warehouse.filaments.push({
+            id: 'f-' + Date.now(),
+            ...this.newFilament
+          });
+          this.showToast('Филамент добавлен на склад');
+        }
+
+        this.showAddFilamentModal = false;
+        this.editingFilamentId = null;
+        this.saveToStorage();
+      },
+
+      removeFilament(id) {
+        this.warehouse.filaments = this.warehouse.filaments.filter(f => f.id !== id);
+        this.saveToStorage();
+        this.showToast('Пластик удален');
+      },
+
+      // Управление складом: Тара
+      openAddContainerModal() {
+        this.editingContainerId = null;
+        this.newContainer = { name: '', volumeMl: 5, packQty: 100, packPrice: 2800 };
+        this.showAddContainerModal = true;
+      },
+
+      openEditContainerModal(item) {
+        this.editingContainerId = item.id;
+        this.newContainer = { ...item };
+        this.showAddContainerModal = true;
+      },
+
+      saveContainer() {
+        if (!this.newContainer.name || !this.newContainer.packQty || !this.newContainer.packPrice) {
+          this.showToast('Заполните параметры партии ёмкостей', 'error');
+          return;
+        }
+
+        if (this.editingContainerId) {
+          const index = this.warehouse.containers.findIndex(c => c.id === this.editingContainerId);
+          if (index !== -1) {
+            this.warehouse.containers[index] = { ...this.newContainer, id: this.editingContainerId };
+            this.showToast('Параметры ёмкости обновлены');
+          }
+        } else {
+          this.warehouse.containers.push({
+            id: 'c-' + Date.now(),
+            ...this.newContainer
+          });
+          this.showToast('Ёмкости добавлены на склад');
+        }
+
+        this.showAddContainerModal = false;
+        this.editingContainerId = null;
+        this.saveToStorage();
+      },
+
+      removeContainer(id) {
+        this.warehouse.containers = this.warehouse.containers.filter(c => c.id !== id);
+        this.saveToStorage();
+        this.showToast('Ёмкость удалена');
+      },
+
+      // Управление складом: Краска
+      openAddPaintModal() {
+        this.editingPaintId = null;
+        this.newPaint = { color: '', brand: '', hex: '#3b82f6', volumeMl: 250, price: 1800 };
+        this.showAddPaintModal = true;
+      },
+
+      openEditPaintModal(item) {
+        this.editingPaintId = item.id;
+        this.newPaint = { ...item };
+        this.showAddPaintModal = true;
+      },
+
+      savePaint() {
+        if (!this.newPaint.color || !this.newPaint.volumeMl || !this.newPaint.price) {
+          this.showToast('Заполните название цвета, объём и цену бутылки', 'error');
+          return;
+        }
+
+        if (this.editingPaintId) {
+          const index = this.warehouse.paints.findIndex(p => p.id === this.editingPaintId);
+          if (index !== -1) {
+            this.warehouse.paints[index] = { ...this.newPaint, id: this.editingPaintId };
+            this.showToast('Данные о краске обновлены');
+          }
+        } else {
+          this.warehouse.paints.push({
+            id: 'p-' + Date.now(),
+            ...this.newPaint
+          });
+          this.showToast('Бутылка краски добавлена на склад');
+        }
+
+        this.showAddPaintModal = false;
+        this.editingPaintId = null;
+        this.saveToStorage();
+      },
+
+      removePaint(id) {
+        this.warehouse.paints = this.warehouse.paints.filter(p => p.id !== id);
+        this.saveToStorage();
+        this.showToast('Краска удалена');
+      },
+
+      // Модалка для Кистей/Инструкций/Пакетов
+      promptAddAccessory(type) {
+        this.accessoryModal.id = null;
+        this.accessoryModal.type = type;
+        if (type === 'brush') this.accessoryModal.title = 'Добавить кисть';
+        if (type === 'card') this.accessoryModal.title = 'Добавить полиграфию/карточку';
+        if (type === 'packaging') this.accessoryModal.title = 'Добавить упаковку/пакет';
+        this.accessoryModal.name = '';
+        this.accessoryModal.price = 90;
+        this.accessoryModal.show = true;
+      },
+
+      promptEditAccessory(type, item) {
+        this.accessoryModal.id = item.id;
+        this.accessoryModal.type = type;
+        if (type === 'brush') this.accessoryModal.title = 'Редактировать кисть';
+        if (type === 'card') this.accessoryModal.title = 'Редактировать полиграфию';
+        if (type === 'packaging') this.accessoryModal.title = 'Редактировать упаковку';
+        this.accessoryModal.name = item.name;
+        this.accessoryModal.price = item.price;
+        this.accessoryModal.show = true;
+      },
+
+      saveAccessoryItem() {
+        if (!this.accessoryModal.name.trim()) return;
+        const targetMap = {
+          brush: 'brushes',
+          card: 'insertCards',
+          packaging: 'packagings'
+        };
+        const collection = targetMap[this.accessoryModal.type];
+        if (!collection) return;
+
+        if (this.accessoryModal.id) {
+          const idx = this.warehouse[collection].findIndex(i => i.id === this.accessoryModal.id);
+          if (idx !== -1) {
+            this.warehouse[collection][idx] = {
+              id: this.accessoryModal.id,
+              name: this.accessoryModal.name,
+              price: Number(this.accessoryModal.price) || 0
+            };
+            this.showToast('Позиция обновлена');
+          }
+        } else {
+          this.warehouse[collection].push({
+            id: 'acc-' + Date.now(),
+            name: this.accessoryModal.name,
+            price: Number(this.accessoryModal.price) || 0
+          });
+          this.showToast('Позиция добавлена');
+        }
+
+        this.accessoryModal.show = false;
+        this.accessoryModal.id = null;
+        this.saveToStorage();
+      },
+
+      removeWarehouseItem(collectionName, id) {
+        if (this.warehouse[collectionName]) {
+          this.warehouse[collectionName] = this.warehouse[collectionName].filter(item => item.id !== id);
+          this.saveToStorage();
+          this.showToast('Позиция удалена');
+        }
+      },
+
+      // Синхронизация данных с LocalStorage
+      saveToStorage() {
+        try {
+          localStorage.setItem('artkit_warehouse', JSON.stringify(this.warehouse));
+          localStorage.setItem('artkit_saved_sets', JSON.stringify(this.savedSets));
+        } catch (e) {
+          console.warn('LocalStorage error:', e);
+        }
+      },
+
+      loadFromStorage() {
+        try {
+          const wh = localStorage.getItem('artkit_warehouse');
+          if (wh) {
+            this.warehouse = JSON.parse(wh);
+          }
+          const sets = localStorage.getItem('artkit_saved_sets');
+          if (sets) {
+            this.savedSets = JSON.parse(sets);
+          }
+        } catch (e) {
+          console.warn('Load storage error:', e);
+        }
+      }
+    },
+    mounted() {
+      // Загружаем сохранённые данные из локального хранилища
+      this.loadFromStorage();
+
+      // Если сохранённых наборов ещё нет, инициализируем демонстрационный
+      if (this.savedSets.length === 0) {
+        this.savedSets.push({
+          id: 'demo-set-1',
+          name: '3D Раскраска: Дракончик Эрни',
+          sku: 'KIT-3D-DRG',
+          filamentId: 'f-1',
+          filamentGrams: 42,
+          paints: [
+            { containerId: 'c-2', paintId: 'p-1' },
+            { containerId: 'c-2', paintId: 'p-3' },
+            { containerId: 'c-2', paintId: 'p-4' },
+            { containerId: 'c-2', paintId: 'p-5' }
+          ],
+          brushId: 'b-1',
+          brushQty: 1,
+          insertCardId: 'i-1',
+          insertCardQty: 1,
+          packagingId: 'pk-1',
+          packagingQty: 1,
+          extraOverhead: 50,
+          marginPercent: 120,
+          totalCost: 650.00,
+          retailPrice: 1430.00,
+          profit: 780.00
+        });
+      }
+    }
+  }).mount('#app');
+</script>
+</body>
+</html>
